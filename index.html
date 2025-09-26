@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异步寻宝游戏</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes treasureGlow {
+            0% { box-shadow: 0 0 5px #fbbf24; }
+            50% { box-shadow: 0 0 20px #f59e0b; }
+            100% { box-shadow: 0 0 5px #fbbf24; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .treasure-glow {
+            animation: treasureGlow 2s infinite;
+        }
+        
+        .map-container {
+            background: linear-gradient(135deg, #d4a574 0%, #8b5a2b 100%);
+            border: 15px solid #8B4513;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .treasure-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawPath 3s ease-in-out forwards;
+        }
+        
+        @keyframes drawPath {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+        
+        .character {
+            transition: all 0.5s ease;
+        }
+        
+        .treasure-item {
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+        
+        .treasure-found {
+            transform: scale(1);
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 to-amber-100 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-amber-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold"><i class="fas fa-treasure-chest mr-2"></i>异步寻宝大冒险</h1>
+            <button id="menuBtn" class="md:hidden text-2xl">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div id="mobileMenu" class="hidden md:flex md:items-center space-x-6">
+                <a href="#" class="block py-2 px-4 hover:bg-amber-700 rounded">首页</a>
+                <a href="#" class="block py-2 px-4 hover:bg-amber-700 rounded">游戏规则</a>
+                <a href="#" class="block py-2 px-4 hover:bg-amber-700 rounded">排行榜</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 游戏主界面 -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- 游戏标题和说明 -->
+        <div class="text-center mb-8 fade-in">
+            <h2 class="text-4xl font-bold text-amber-900 mb-4">寻宝大冒险</h2>
+            <p class="text-lg text-amber-700 max-w-2xl mx-auto">
+                欢迎来到神秘的宝藏岛！使用异步魔法探索各个区域，寻找隐藏的宝藏。
+                每个关卡都有不同的挑战，使用async/await魔法来逐步解锁宝藏吧！
+            </p>
+        </div>
+
+        <!-- 游戏控制区域 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8 fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-amber-800 mb-4 md:mb-0">寻宝控制台</h3>
+                <div class="flex space-x-4">
+                    <button id="startGame" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg font-semibold transition-all pulse">
+                        <i class="fas fa-play mr-2"></i>开始寻宝
+                    </button>
+                    <button id="resetGame" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold transition-all">
+                        <i class="fas fa-redo mr-2"></i>重置游戏
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 游戏状态显示 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-amber-100 p-4 rounded-lg text-center">
+                    <p class="text-amber-800 font-semibold">当前关卡</p>
+                    <p id="currentLevel" class="text-2xl font-bold text-amber-900">1</p>
+                </div>
+                <div class="bg-amber-100 p-4 rounded-lg text-center">
+                    <p class="text-amber-800 font-semibold">已发现宝藏</p>
+                    <p id="treasuresFound" class="text-2xl font-bold text-amber-900">0/5</p>
+                </div>
+                <div class="bg-amber-100 p-4 rounded-lg text-center">
+                    <p class="text-amber-800 font-semibold">游戏状态</p>
+                    <p id="gameStatus" class="text-2xl font-bold text-amber-900">准备开始</p>
+                </div>
+            </div>
+            
+            <!-- 游戏日志 -->
+            <div class="bg-gray-100 p-4 rounded-lg h-40 overflow-y-auto">
+                <h4 class="font-bold text-gray-700 mb-2">寻宝日志:</h4>
+                <div id="gameLog" class="text-sm text-gray-600">
+                    <p>> 游戏准备就绪，点击"开始寻宝"按钮开始冒险！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 寻宝地图区域 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8 fade-in">
+            <h3 class="text-2xl font-bold text-amber-800 mb-4">宝藏地图</h3>
+            
+            <div class="map-container rounded-lg p-4 relative h-96 overflow-hidden">
+                <!-- 地图背景 -->
+                <div class="absolute inset-0 bg-gradient-to-br from-green-300 to-green-600 opacity-30"></div>
+                
+                <!-- 地图网格 -->
+                <div class="absolute inset-0 opacity-20" style="background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 40px 40px;"></div>
+                
+                <!-- 寻宝路径 -->
+                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+                    <path id="treasurePath" class="treasure-path" d="M10,50 Q25,30 40,50 T70,50 T90,30" stroke="#f59e0b" stroke-width="2" fill="none"/>
+                </svg>
+                
+                <!-- 角色 -->
+                <div id="character" class="character absolute w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style="left: 5%; top: 45%;">
+                    <i class="fas fa-user"></i>
+                </div>
+                
+                <!-- 关卡点 -->
+                <div class="level-point absolute w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style="left: 20%; top: 30%;" data-level="1">
+                    <span>1</span>
+                </div>
+                <div class="level-point absolute w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style="left: 40%; top: 45%;" data-level="2">
+                    <span>2</span>
+                </div>
+                <div class="level-point absolute w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style="left: 70%; top: 45%;" data-level="3">
+                    <span>3</span>
+                </div>
+                <div class="level-point absolute w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg" style="left: 90%; top: 25%;" data-level="4">
+                    <span>4</span>
+                </div>
+                
+                <!-- 宝藏 -->
+                <div id="treasure" class="absolute w-16 h-16 bg-yellow-500 rounded-lg flex items-center justify-center text-2xl text-white shadow-lg treasure-glow" style="left: 85%; top: 70%; display: none;">
+                    <i class="fas fa-gem"></i>
+                </div>
+                
+                <!-- 宝藏物品 -->
+                <div class="treasure-item absolute w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white" style="left: 30%; top: 60%;" data-treasure="1">
+                    <i class="fas fa-coins"></i>
+                </div>
+                <div class="treasure-item absolute w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white" style="left: 50%; top: 20%;" data-treasure="2">
+                    <i class="fas fa-gem"></i>
+                </div>
+                <div class="treasure-item absolute w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white" style="left: 60%; top: 65%;" data-treasure="3">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div class="treasure-item absolute w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white" style="left: 80%; top: 35%;" data-treasure="4">
+                    <i class="fas fa-ring"></i>
+                </div>
+                <div class="treasure-item absolute w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white" style="left: 90%; top: 70%;" data-treasure="5">
+                    <i class="fas fa-treasure-chest"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关卡详情区域 -->
+        <div id="levelDetails" class="bg-white rounded-xl shadow-lg p-6 fade-in">
+            <h3 class="text-2xl font-bold text-amber-800 mb-4">关卡详情</h3>
+            <div id="levelContent" class="text-gray-700">
+                <p>游戏尚未开始，点击"开始寻宝"按钮启动冒险！</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 移动端菜单切换（原代码功能）
+        const menuBtn = document.getElementById('menuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+
+        menuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+            const icon = menuBtn.querySelector('i');
+            if (mobileMenu.classList.contains('hidden')) {
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
+            } else {
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-times');
+            }
+        });
+
+        // 寻宝游戏逻辑
+        const startBtn = document.getElementById('startGame');
+        const resetBtn = document.getElementById('resetGame');
+        const currentLevelEl = document.getElementById('currentLevel');
+        const treasuresFoundEl = document.getElementById('treasuresFound');
+        const gameStatusEl = document.getElementById('gameStatus');
+        const gameLogEl = document.getElementById('gameLog');
+        const levelContentEl = document.getElementById('levelContent');
+        const characterEl = document.getElementById('character');
+        const treasureEl = document.getElementById('treasure');
+        
+        let currentLevel = 0;
+        let treasuresFound = 0;
+        let gameActive = false;
+        
+        // 关卡数据
+        const levels = [
+            {
+                title: "神秘森林",
+                description: "你来到了一个神秘的森林，这里据说隐藏着古老的宝藏。你需要解开谜题才能继续前进。",
+                task: "寻找森林中的金色硬币",
+                treasure: 1,
+                position: { left: '20%', top: '30%' }
+            },
+            {
+                title: "古老神庙",
+                description: "穿过森林，你发现了一座古老的神庙。神庙的入口被魔法封印，需要正确的咒语才能打开。",
+                task: "解开神庙入口的谜题",
+                treasure: 2,
+                position: { left: '40%', top: '45%' }
+            },
+            {
+                title: "地下迷宫",
+                description: "神庙内部是一个复杂的地下迷宫。你需要找到正确的路径，避开陷阱。",
+                task: "通过迷宫找到出口",
+                treasure: 3,
+                position: { left: '70%', top: '45%' }
+            },
+            {
+                title: "龙之巢穴",
+                description: "迷宫的尽头是传说中的龙之巢穴。巨龙守护着最后的宝藏，你需要智取而非力敌。",
+                task: "说服巨龙交出宝藏",
+                treasure: 4,
+                position: { left: '90%', top: '25%' }
+            },
+            {
+                title: "最终宝藏",
+                description: "恭喜你！你成功获得了所有宝藏部件，现在可以打开最终的宝藏箱了！",
+                task: "打开宝藏箱",
+                treasure: 5,
+                position: { left: '85%', top: '70%' }
+            }
+        ];
+        
+        // 添加日志
+        function addLog(message) {
+            const logEntry = document.createElement('p');
+            logEntry.textContent = `> ${message}`;
+            gameLogEl.appendChild(logEntry);
+            gameLogEl.scrollTop = gameLogEl.scrollHeight;
+        }
+        
+        // 移动角色到指定位置
+        async function moveCharacterTo(position, duration = 2000) {
+            return new Promise(resolve => {
+                characterEl.style.transition = `all ${duration}ms ease-in-out`;
+                characterEl.style.left = position.left;
+                characterEl.style.top = position.top;
+                
+                setTimeout(() => {
+                    resolve();
+                }, duration);
+            });
+        }
+        
+        // 显示宝藏动画
+        async function showTreasure(treasureId) {
+            const treasureItem = document.querySelector(`.treasure-item[data-treasure="${treasureId}"]`);
+            treasureItem.classList.add('treasure-found');
+            
+            // 添加找到宝藏的动画效果
+            treasureItem.style.animation = 'pulse 1s 3';
+            
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    resolve();
+                }, 1500);
+            });
+        }
+        
+        // 显示最终宝藏
+        function showFinalTreasure() {
+            treasureEl.style.display = 'flex';
+            treasureEl.classList.add('pulse');
+        }
+        
+        // 关卡逻辑
+        async function playLevel(levelIndex) {
+            if (levelIndex >= levels.length) {
+                // 游戏结束
+                gameActive = false;
+                gameStatusEl.textContent = "已完成";
+                startBtn.disabled = true;
+                showFinalTreasure();
+                addLog("恭喜！你找到了所有宝藏，完成了寻宝冒险！");
+                return;
+            }
+            
+            const level = levels[levelIndex];
+            currentLevel = levelIndex + 1;
+            currentLevelEl.textContent = currentLevel;
+            gameStatusEl.textContent = `进行中 - ${level.title}`;
+            
+            // 更新关卡详情
+            levelContentEl.innerHTML = `
+                <h4 class="text-xl font-bold text-amber-700 mb-2">${level.title}</h4>
+                <p class="mb-4">${level.description}</p>
+                <div class="bg-amber-100 p-3 rounded-lg">
+                    <p class="font-semibold text-amber-800">任务:</p>
+                    <p>${level.task}</p>
+                </div>
+            `;
+            
+            addLog(`到达 ${level.title}`);
+            
+            // 移动角色到关卡位置
+            await moveCharacterTo(level.position);
+            
+            addLog(`开始执行任务: ${level.task}`);
+            
+            // 模拟任务执行时间
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // 找到宝藏
+            await showTreasure(level.treasure);
+            treasuresFound++;
+            treasuresFoundEl.textContent = `${treasuresFound}/5`;
+            
+            addLog(`找到了宝藏 #${level.treasure}！`);
+            
+            // 短暂延迟后进入下一关
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 递归调用下一关
+            await playLevel(levelIndex + 1);
+        }
+        
+        // 开始游戏
+        startBtn.addEventListener('click', async () => {
+            if (gameActive) return;
+            
+            gameActive = true;
+            startBtn.disabled = true;
+            startBtn.classList.remove('pulse');
+            gameStatusEl.textContent = "进行中";
+            
+            addLog("寻宝冒险开始！");
+            
+            // 开始第一关
+            await playLevel(0);
+        });
+        
+        // 重置游戏
+        resetBtn.addEventListener('click', () => {
+            gameActive = false;
+            currentLevel = 0;
+            treasuresFound = 0;
+            
+            currentLevelEl.textContent = "1";
+            treasuresFoundEl.textContent = "0/5";
+            gameStatusEl.textContent = "准备开始";
+            
+            // 重置角色位置
+            characterEl.style.transition = 'none';
+            characterEl.style.left = '5%';
+            characterEl.style.top = '45%';
+            
+            // 隐藏最终宝藏
+            treasureEl.style.display = 'none';
+            treasureEl.classList.remove('pulse');
+            
+            // 重置宝藏物品
+            document.querySelectorAll('.treasure-item').forEach(item => {
+                item.classList.remove('treasure-found');
+                item.style.animation = 'none';
+            });
+            
+            // 清空日志
+            gameLogEl.innerHTML = '<p>> 游戏已重置，点击"开始寻宝"按钮开始冒险！</p>';
+            
+            // 重置关卡详情
+            levelContentEl.innerHTML = '<p>游戏尚未开始，点击"开始寻宝"按钮启动冒险！</p>';
+            
+            // 启用开始按钮
+            startBtn.disabled = false;
+            startBtn.classList.add('pulse');
+            
+            addLog("游戏已重置");
+        });
+    </script>
+</body>
+</html>
